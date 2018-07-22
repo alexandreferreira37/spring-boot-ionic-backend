@@ -1,6 +1,7 @@
 package com.nelioalves.cursomc.services;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -32,20 +33,17 @@ public class ClienteService {
 	
 	
 	public Cliente find(Integer id) {
-		
-		Cliente obj = repo.findOne(id);
-		if (obj == null) {
-			throw new ObjectNotFoundException("Objeto não encontrado! Id: " + id + ", Tipo: "+ Cliente.class.getName());
-		}
-		
-		return obj;
+				
+		Optional<Cliente> obj = repo.findById(id);
+		return obj.orElseThrow(() -> new ObjectNotFoundException(
+				"Objeto não encontrado! Id: " + id + ", Tipo: " + Cliente.class.getName()));
 	}
 
 	@Transactional
 	public Cliente insert(Cliente obj) {
 		obj.setId(null);
 		obj = repo.save(obj);
-		enderecoRepository.save(obj.getEnderecos());
+		enderecoRepository.saveAll(obj.getEnderecos());
 		return obj;
 	}
 	
@@ -59,7 +57,7 @@ public class ClienteService {
 	public void delete(Integer id) {
 		find(id);
 		try {
-		   repo.delete(id); //no spring 2 utilizar o deleteById
+		   repo.deleteById(id); //no spring 2 utilizar o deleteById
 		}   
 		catch(DataIntegrityViolationException e) {
 			throw new DataIntegrityException("Não é possível excluir porque há pedidos relacionados.");
@@ -73,7 +71,7 @@ public class ClienteService {
 	
 	public Page<Cliente> findPage(Integer page, Integer linesPerPage, String orderBy, String direction){
 		
-		PageRequest pageRequest = new PageRequest(page, linesPerPage, Direction.valueOf(direction), orderBy);
+		PageRequest pageRequest =  PageRequest.of(page, linesPerPage, Direction.valueOf(direction), orderBy);
 		return repo.findAll(pageRequest);
 	}
 	
