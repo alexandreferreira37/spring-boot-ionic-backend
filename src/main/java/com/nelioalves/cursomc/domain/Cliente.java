@@ -47,7 +47,7 @@ public class Cliente implements Serializable {
 	private Set<String> telefones = new HashSet<>();
 
 	// implementa um conjunto set para o perfil dos clientes
-	@ElementCollection
+	@ElementCollection(fetch=FetchType.EAGER)
 	@CollectionTable(name="PERFIS")
 	private Set<Integer> perfis = new HashSet<>();
 	

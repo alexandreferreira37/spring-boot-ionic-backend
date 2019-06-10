@@ -15,11 +15,14 @@ import org.springframework.transaction.annotation.Transactional;
 import com.nelioalves.cursomc.domain.Cidade;
 import com.nelioalves.cursomc.domain.Cliente;
 import com.nelioalves.cursomc.domain.Endereco;
+import com.nelioalves.cursomc.domain.enums.Perfil;
 import com.nelioalves.cursomc.domain.enums.TipoCliente;
 import com.nelioalves.cursomc.dto.ClienteDTO;
 import com.nelioalves.cursomc.dto.ClienteNewDTO;
 import com.nelioalves.cursomc.repositories.ClienteRepository;
 import com.nelioalves.cursomc.repositories.EnderecoRepository;
+import com.nelioalves.cursomc.security.UserSS;
+import com.nelioalves.cursomc.services.exceptions.AuthorizationException;
 import com.nelioalves.cursomc.services.exceptions.DataIntegrityException;
 import com.nelioalves.cursomc.services.exceptions.ObjectNotFoundException;
 
@@ -27,22 +30,27 @@ import com.nelioalves.cursomc.services.exceptions.ObjectNotFoundException;
 public class ClienteService {
 	
 	@Autowired
-	private BCryptPasswordEncoder pe;
-	
-	@Autowired
-	private ClienteRepository repo; 
+	private ClienteRepository repo;
 	
 	@Autowired
 	private EnderecoRepository enderecoRepository;
 	
-	
+	@Autowired
+	private BCryptPasswordEncoder pe;
+			
+		
 	public Cliente find(Integer id) {
-				
+		
+		UserSS user = UserService.authenticated();
+		if (user==null || !user.hasRole(Perfil.ADMIN) && !id.equals(user.getId())) {
+			throw new AuthorizationException("Acesso negado");
+		}
+		
 		Optional<Cliente> obj = repo.findById(id);
 		return obj.orElseThrow(() -> new ObjectNotFoundException(
 				"Objeto não encontrado! Id: " + id + ", Tipo: " + Cliente.class.getName()));
 	}
-
+	
 	@Transactional
 	public Cliente insert(Cliente obj) {
 		obj.setId(null);
@@ -53,36 +61,47 @@ public class ClienteService {
 	
 	public Cliente update(Cliente obj) {
 		Cliente newObj = find(obj.getId());
-		updateData(newObj, obj);		
+		updateData(newObj, obj);
 		return repo.save(newObj);
 	}
-
 
 	public void delete(Integer id) {
 		find(id);
 		try {
-		   repo.deleteById(id); //no spring 2 utilizar o deleteById
-		}   
-		catch(DataIntegrityViolationException e) {
-			throw new DataIntegrityException("Não é possível excluir porque há pedidos relacionados.");
+			repo.deleteById(id);
+		}
+		catch (DataIntegrityViolationException e) {
+			throw new DataIntegrityException("Não é possível excluir porque há pedidos relacionados");
 		}
 	}
-
-
+	
 	public List<Cliente> findAll() {
 		return repo.findAll();
-	}	
+	}
 	
-	public Page<Cliente> findPage(Integer page, Integer linesPerPage, String orderBy, String direction){
-		
-		PageRequest pageRequest =  PageRequest.of(page, linesPerPage, Direction.valueOf(direction), orderBy);
+	public Cliente findByEmail(String email) {
+		UserSS user = UserService.authenticated();
+		if (user == null || !user.hasRole(Perfil.ADMIN) && !email.equals(user.getUsername())) {
+			throw new AuthorizationException("Acesso negado");
+		}
+	
+		Cliente obj = repo.findByEmail(email);
+		if (obj == null) {
+			throw new ObjectNotFoundException(
+					"Objeto não encontrado! Id: " + user.getId() + ", Tipo: " + Cliente.class.getName());
+		}
+		return obj;
+	}
+	
+	public Page<Cliente> findPage(Integer page, Integer linesPerPage, String orderBy, String direction) {
+		PageRequest pageRequest = PageRequest.of(page, linesPerPage, Direction.valueOf(direction), orderBy);
 		return repo.findAll(pageRequest);
 	}
 	
 	public Cliente fromDTO(ClienteDTO objDto) {
 		return new Cliente(objDto.getId(), objDto.getNome(), objDto.getEmail(), null, null, null);
 	}
-
+	
 	public Cliente fromDTO(ClienteNewDTO objDto) {
 		Cliente cli = new Cliente(null, objDto.getNome(), objDto.getEmail(), objDto.getCpfOuCnpj(), TipoCliente.toEnum(objDto.getTipo()), pe.encode(objDto.getSenha()));
 		Cidade cid = new Cidade(objDto.getCidadeId(), null, null);
@@ -98,10 +117,9 @@ public class ClienteService {
 		return cli;
 	}
 	
-	
 	private void updateData(Cliente newObj, Cliente obj) {
 		newObj.setNome(obj.getNome());
-		newObj.setEmail(obj.getEmail());		
+		newObj.setEmail(obj.getEmail());
 	}
-
+	
 }
